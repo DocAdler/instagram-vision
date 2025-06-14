@@ -57,3 +57,10 @@ docker run -p 8000:8000 -e PORT=8000 instagram-vision
 Create a `.env` file locally or export variables before starting the server. When testing locally the API
 listens on `http://localhost:8000` by default. Set `PORT` and `HOST` if you need a different address. In n8n you
 can switch between your Railway deployment and local instance by changing the base URL in HTTP Request nodes.
+
+## Railway deployment
+
+When deploying on Railway, monitor the build logs right after `pip install -r requirements.txt`.
+If the install fails because wheels are missing or due to network errors, pin package versions in
+`requirements.txt` that provide prebuilt wheels. Redeploy after adjusting the file and confirm that
+all dependencies install without errors.
