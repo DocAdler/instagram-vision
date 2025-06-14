@@ -14,6 +14,8 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+Note that `httpx` is pinned to `<0.28` in `requirements.txt` for compatibility with `instagrapi`.
+
 Use the `/login` endpoint to obtain a token before calling other routes. The token must be supplied as
 `?token=...` query parameter. Media content for a post or story can be retrieved through `/download/{media_id}`.
 
