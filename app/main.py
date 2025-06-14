@@ -26,6 +26,7 @@ class LoginRequest(BaseModel):
 
 @app.post("/login")
 def login(req: LoginRequest):
+
     """Create an authenticated or anonymous session.
 
     If no credentials are supplied an anonymous session is returned. Some
@@ -34,6 +35,7 @@ def login(req: LoginRequest):
     """
 
     client = Client(enforce_login=False)
+
     if req.sessionid:
         client.sessionid = req.sessionid
         try:
@@ -42,6 +44,7 @@ def login(req: LoginRequest):
             raise HTTPException(status_code=401, detail=str(e))
     elif req.username and req.password:
         try:
+
             client.login(req.username, req.password)
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
@@ -49,6 +52,7 @@ def login(req: LoginRequest):
     token = str(uuid.uuid4())
     _sessions[token] = client
     return {"token": token}
+
 
 
 @app.post("/logout")
@@ -155,7 +159,6 @@ def hashtag(tag: str, token: str = Query(...), limit: int = 10):
         for m in medias
     ]
     return {"hashtag": tag, "posts": items}
-
 
 @app.get("/reels/{username}")
 def reels(username: str, token: str = Query(...), limit: int = 5):
