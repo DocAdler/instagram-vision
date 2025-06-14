@@ -15,6 +15,7 @@ python -m app.main
 
 Use the `/login` endpoint to obtain a token before calling other routes. The token must be supplied as
 `?token=...` query parameter. Media content for a post or story can be retrieved through `/download/{media_id}`.
+
 If you omit credentials when calling `/login`, an anonymous session is created. Some endpoints may require
 authentication to succeed.
 
