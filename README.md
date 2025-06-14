@@ -39,3 +39,7 @@ Build and run:
 docker build -t instagram-vision .
 docker run -p 8000:8000 instagram-vision
 ```
+
+## Responsible use
+
+Ensure you follow Instagram's Terms of Service and comply with local laws when scraping or downloading content.
