@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 _sessions: dict[str, Client] = {}
 
 if not os.getenv("INSTAGRAM_USERNAME") or not os.getenv("INSTAGRAM_PASSWORD"):
-    logger.warning("INSTAGRAM_USERNAME or INSTAGRAM_PASSWORD not set; provide credentials via /login if needed")
+    logger.warning(
+        "INSTAGRAM_USERNAME or INSTAGRAM_PASSWORD not set; provide credentials via /login if needed"
+    )
 
 
 def safe_call(func, *args, **kwargs):
@@ -139,7 +141,10 @@ def stories(username: str, token: str = Query(...)):
     client = get_client(token)
     user_id = safe_call(client.user_id_from_username, username)
     sts = safe_call(client.user_stories, user_id)
-    items = [{"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()} for s in sts]
+    items = [
+        {"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()}
+        for s in sts
+    ]
     return {"stories": items}
 
 
