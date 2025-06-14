@@ -2,10 +2,17 @@
 
 FastAPI-based Instagram scraper built with `instagrapi`. It exposes endpoints for profiles, posts, comments,
 stories, reels, highlights, followers, followings and hashtag search. Authentication works via
-username/password or `sessionid`. Media can be downloaded through a dedicated endpoint. The service is
-ready for Railway deployment via Docker.
+username/password, `sessionid`, or anonymously. Media can be downloaded through a dedicated endpoint.
+The service is ready for Railway deployment via Docker and integrates well with n8n via HTTP requests.
 
 
+If you omit credentials when calling `/login`, an anonymous session is created. Some endpoints may require
+authentication to succeed.
+
+### n8n integration
+
+The API can be accessed from n8n via the HTTP Request node. Provide the token as a query parameter and parse
+the JSON response for further automation.
 ## Quick start
 
 ```bash

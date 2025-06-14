@@ -1,10 +1,14 @@
 import uuid
 
-from pathlib import Path
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from instagrapi import Client
+    """Create an authenticated or anonymous session.
+
+    If no credentials are supplied an anonymous session is returned. Some
+    endpoints may fail when used anonymously, but basic data can still be
+    retrieved.
+    """
+
+    client = Client(enforce_login=False)
+
 
 app = FastAPI()
 _sessions: dict[str, Client] = {}
@@ -75,10 +79,7 @@ def posts(username: str, token: str = Query(...), limit: int = 5):
     medias = client.user_medias(user_id, amount=limit)
     items = [
         {
-            "id": m.id,
-            "shortcode": m.code,
-            "caption": m.caption_text,
-            "url": m.thumbnail_url,
+    items = [{"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()} for s in sts]
             "taken_at": m.taken_at.isoformat(),
         }
         for m in medias
