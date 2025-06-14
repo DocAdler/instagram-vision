@@ -33,6 +33,7 @@ def login(req: LoginRequest):
     retrieved.
     """
 
+
     client = Client()
     if req.sessionid:
         client.sessionid = req.sessionid
