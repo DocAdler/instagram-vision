@@ -8,4 +8,4 @@ COPY . .
 # ignore any failure when writing the file.
 RUN echo 'nameserver 1.1.1.1\nnameserver 8.8.8.8' | tee /etc/resolv.conf >/dev/null || true
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "$PORT"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
