@@ -5,6 +5,7 @@ stories, reels, highlights, followers, followings and hashtag search. Authentica
 username/password or `sessionid`. Media can be downloaded through a dedicated endpoint. The service is
 ready for Railway deployment via Docker.
 
+
 ## Quick start
 
 ```bash
@@ -14,6 +15,7 @@ uvicorn app.main:app --reload
 
 Use the `/login` endpoint to obtain a token before calling other routes. The token must be supplied as
 `?token=...` query parameter. Media content for a post or story can be retrieved through `/download/{media_id}`.
+
 
 ## Docker
 

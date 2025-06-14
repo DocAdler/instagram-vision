@@ -1,4 +1,5 @@
 import uuid
+
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -17,16 +18,20 @@ class LoginRequest(BaseModel):
 
 @app.post("/login")
 def login(req: LoginRequest):
+
     client = Client()
     if req.sessionid:
         client.sessionid = req.sessionid
         try:
             client.user_info(client.user_id_from_username("instagram"))
+
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
     elif req.username and req.password:
         try:
+
             client.login(req.username, req.password)
+
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
     else:
@@ -34,6 +39,7 @@ def login(req: LoginRequest):
             status_code=400, detail="Provide sessionid or username/password"
         )
     token = str(uuid.uuid4())
+
     _sessions[token] = client
     return {"token": token}
 
@@ -47,6 +53,7 @@ def get_client(token: str) -> Client:
 
 @app.get("/profile/{username}")
 def profile(username: str, token: str = Query(...)):
+
     client = get_client(token)
     info = client.user_info_by_username(username)
     return {
@@ -62,6 +69,7 @@ def profile(username: str, token: str = Query(...)):
 
 @app.get("/posts/{username}")
 def posts(username: str, token: str = Query(...), limit: int = 5):
+
     client = get_client(token)
     user_id = client.user_id_from_username(username)
     medias = client.user_medias(user_id, amount=limit)
@@ -96,6 +104,7 @@ def comments(media_id: str, token: str = Query(...), limit: int = 20):
 
 @app.get("/stories/{username}")
 def stories(username: str, token: str = Query(...)):
+
     client = get_client(token)
     user_id = client.user_id_from_username(username)
     sts = client.user_stories(user_id)
@@ -106,24 +115,30 @@ def stories(username: str, token: str = Query(...)):
     return {"stories": items}
 
 
+
 @app.get("/followers/{username}")
 def followers(username: str, token: str = Query(...), limit: int = 20):
+
     client = get_client(token)
     user_id = client.user_id_from_username(username)
     data = client.user_followers(user_id, amount=limit)
     return {"followers": [u.username for u in data.values()]}
 
 
+
 @app.get("/followings/{username}")
 def followings(username: str, token: str = Query(...), limit: int = 20):
+
     client = get_client(token)
     user_id = client.user_id_from_username(username)
     data = client.user_following(user_id, amount=limit)
     return {"followings": [u.username for u in data.values()]}
 
 
+
 @app.get("/hashtag/{tag}")
 def hashtag(tag: str, token: str = Query(...), limit: int = 10):
+
     client = get_client(token)
     medias = client.hashtag_medias_recent(tag, amount=limit)
     items = [
@@ -136,6 +151,7 @@ def hashtag(tag: str, token: str = Query(...), limit: int = 10):
         for m in medias
     ]
     return {"hashtag": tag, "posts": items}
+
 
 
 @app.get("/reels/{username}")
