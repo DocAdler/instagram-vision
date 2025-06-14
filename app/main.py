@@ -1,12 +1,30 @@
+import logging
+import os
 import uuid
 from pathlib import Path
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+import socket
+import time
 from instagrapi import Client
 
 app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 _sessions: dict[str, Client] = {}
+
+if not os.getenv("INSTAGRAM_USERNAME") or not os.getenv("INSTAGRAM_PASSWORD"):
+    logger.warning("INSTAGRAM_USERNAME or INSTAGRAM_PASSWORD not set; provide credentials via /login if needed")
+
+
+def safe_call(func, *args, **kwargs):
+    try:
+        return func(*args, **kwargs)
+    except socket.gaierror as e:
+        logger.warning("DNS error: %s; retrying", e)
+        time.sleep(1)
+        return func(*args, **kwargs)
 
 
 @app.get("/")
@@ -70,7 +88,7 @@ def get_client(token: str) -> Client:
 @app.get("/profile/{username}")
 def profile(username: str, token: str = Query(...)):
     client = get_client(token)
-    info = client.user_info_by_username(username)
+    info = safe_call(client.user_info_by_username, username)
     return {
         "username": info.username,
         "full_name": info.full_name,
@@ -85,8 +103,8 @@ def profile(username: str, token: str = Query(...)):
 @app.get("/posts/{username}")
 def posts(username: str, token: str = Query(...), limit: int = 5):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    medias = client.user_medias(user_id, amount=limit)
+    user_id = safe_call(client.user_id_from_username, username)
+    medias = safe_call(client.user_medias, user_id, amount=limit)
     items = [
         {
             "id": m.id,
@@ -103,7 +121,7 @@ def posts(username: str, token: str = Query(...), limit: int = 5):
 @app.get("/comments/{media_id}")
 def comments(media_id: str, token: str = Query(...), limit: int = 20):
     client = get_client(token)
-    cmts = client.media_comments(media_id, amount=limit)
+    cmts = safe_call(client.media_comments, media_id, amount=limit)
     items = [
         {
             "id": c.pk,
@@ -119,35 +137,32 @@ def comments(media_id: str, token: str = Query(...), limit: int = 20):
 @app.get("/stories/{username}")
 def stories(username: str, token: str = Query(...)):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    sts = client.user_stories(user_id)
-    items = [
-        {"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()}
-        for s in sts
-    ]
+    user_id = safe_call(client.user_id_from_username, username)
+    sts = safe_call(client.user_stories, user_id)
+    items = [{"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()} for s in sts]
     return {"stories": items}
 
 
 @app.get("/followers/{username}")
 def followers(username: str, token: str = Query(...), limit: int = 20):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    data = client.user_followers(user_id, amount=limit)
+    user_id = safe_call(client.user_id_from_username, username)
+    data = safe_call(client.user_followers, user_id, amount=limit)
     return {"followers": [u.username for u in data.values()]}
 
 
 @app.get("/followings/{username}")
 def followings(username: str, token: str = Query(...), limit: int = 20):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    data = client.user_following(user_id, amount=limit)
+    user_id = safe_call(client.user_id_from_username, username)
+    data = safe_call(client.user_following, user_id, amount=limit)
     return {"followings": [u.username for u in data.values()]}
 
 
 @app.get("/hashtag/{tag}")
 def hashtag(tag: str, token: str = Query(...), limit: int = 10):
     client = get_client(token)
-    medias = client.hashtag_medias_recent(tag, amount=limit)
+    medias = safe_call(client.hashtag_medias_recent, tag, amount=limit)
     items = [
         {
             "id": m.id,
@@ -163,8 +178,8 @@ def hashtag(tag: str, token: str = Query(...), limit: int = 10):
 @app.get("/reels/{username}")
 def reels(username: str, token: str = Query(...), limit: int = 5):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    clips = client.user_clips(user_id, amount=limit)
+    user_id = safe_call(client.user_id_from_username, username)
+    clips = safe_call(client.user_clips, user_id, amount=limit)
     items = [
         {
             "id": c.id,
@@ -180,11 +195,11 @@ def reels(username: str, token: str = Query(...), limit: int = 5):
 @app.get("/highlights/{username}")
 def highlights(username: str, token: str = Query(...)):
     client = get_client(token)
-    user_id = client.user_id_from_username(username)
-    hl_list = client.highlights_user(user_id)
+    user_id = safe_call(client.user_id_from_username, username)
+    hl_list = safe_call(client.highlights_user, user_id)
     items = []
     for hl in hl_list:
-        for m in client.highlight_medias(hl.id):
+        for m in safe_call(client.highlight_medias, hl.id):
             items.append(
                 {
                     "id": m.id,
@@ -197,22 +212,23 @@ def highlights(username: str, token: str = Query(...)):
 
 
 @app.get("/download/{media_id}")
-def download(
-    media_id: str,
-    token: str = Query(...),
-    background_tasks: BackgroundTasks = None,
-):
+def download(media_id: str, token: str = Query(...)):
     client = get_client(token)
-    info = client.media_info(media_id)
+    info = safe_call(client.media_info, media_id)
     if info.media_type == 1:
-        path = client.photo_download(info.pk)
+        path = safe_call(client.photo_download, info.pk)
     elif info.media_type == 2:
-        path = client.video_download(info.pk)
+        path = safe_call(client.video_download, info.pk)
     elif info.media_type == 8:
-        path = client.album_download(info.pk)
+        path = safe_call(client.album_download, info.pk)
     else:
         raise HTTPException(status_code=400, detail="Unsupported media type")
-    resp = FileResponse(path, filename=Path(path).name)
-    if background_tasks is not None:
-        background_tasks.add_task(Path(path).unlink)
-    return resp
+    return FileResponse(path, filename=Path(path).name)
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run(app, host=host, port=port)
