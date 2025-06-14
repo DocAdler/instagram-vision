@@ -50,7 +50,7 @@ docker run -p 8000:8000 -e PORT=8000 instagram-vision
 
 ### Environment variables
 
-- `PORT` - port the server listens on (default `8000`). Set by Railway automatically.
+- `PORT` - port the server listens on (default `8000`). Railway sets this automatically when using the Dockerfile.
 - `HOST` - interface to bind to. Defaults to `0.0.0.0`.
 - `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD` - optional defaults used for login if provided.
 
