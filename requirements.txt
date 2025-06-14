@@ -2,4 +2,4 @@ fastapi
 uvicorn
 instagrapi
 Pillow
-httpx
+httpx==0.24.1
