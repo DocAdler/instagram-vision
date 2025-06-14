@@ -160,6 +160,7 @@ def hashtag(tag: str, token: str = Query(...), limit: int = 10):
     ]
     return {"hashtag": tag, "posts": items}
 
+
 @app.get("/reels/{username}")
 def reels(username: str, token: str = Query(...), limit: int = 5):
     client = get_client(token)
