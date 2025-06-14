@@ -1,6 +1,6 @@
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from instagrapi import Client
@@ -32,7 +32,6 @@ def login(req: LoginRequest):
     endpoints may fail when used anonymously, but basic data can still be
     retrieved.
     """
-
 
     client = Client()
     if req.sessionid:
@@ -122,7 +121,10 @@ def stories(username: str, token: str = Query(...)):
     client = get_client(token)
     user_id = client.user_id_from_username(username)
     sts = client.user_stories(user_id)
-    items = [{"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()} for s in sts]
+    items = [
+        {"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()}
+        for s in sts
+    ]
     return {"stories": items}
 
 
@@ -195,7 +197,11 @@ def highlights(username: str, token: str = Query(...)):
 
 
 @app.get("/download/{media_id}")
-def download(media_id: str, token: str = Query(...)):
+def download(
+    media_id: str,
+    token: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+):
     client = get_client(token)
     info = client.media_info(media_id)
     if info.media_type == 1:
@@ -206,4 +212,7 @@ def download(media_id: str, token: str = Query(...)):
         path = client.album_download(info.pk)
     else:
         raise HTTPException(status_code=400, detail="Unsupported media type")
-    return FileResponse(path, filename=Path(path).name)
+    resp = FileResponse(path, filename=Path(path).name)
+    if background_tasks is not None:
+        background_tasks.add_task(Path(path).unlink)
+    return resp
