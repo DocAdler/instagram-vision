@@ -1,11 +1,13 @@
 import uuid
+
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
-import instaloader
+from instagrapi import Client
 
 app = FastAPI()
-
-_sessions = {}
+_sessions: dict[str, Client] = {}
 
 
 class LoginRequest(BaseModel):
@@ -16,16 +18,20 @@ class LoginRequest(BaseModel):
 
 @app.post("/login")
 def login(req: LoginRequest):
-    loader = instaloader.Instaloader()
+
+    client = Client()
     if req.sessionid:
-        loader.context.sessionid = req.sessionid
+        client.sessionid = req.sessionid
         try:
-            loader.test_login()
+            client.user_info(client.user_id_from_username("instagram"))
+
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
     elif req.username and req.password:
         try:
-            loader.login(req.username, req.password)
+
+            client.login(req.username, req.password)
+
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
     else:
@@ -33,162 +39,167 @@ def login(req: LoginRequest):
             status_code=400, detail="Provide sessionid or username/password"
         )
     token = str(uuid.uuid4())
-    _sessions[token] = loader
+
+    _sessions[token] = client
     return {"token": token}
 
 
-def get_loader(token: str) -> instaloader.Instaloader:
-    loader = _sessions.get(token)
-    if not loader:
+def get_client(token: str) -> Client:
+    client = _sessions.get(token)
+    if not client:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return loader
+    return client
 
 
 @app.get("/profile/{username}")
 def profile(username: str, token: str = Query(...)):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    data = {
-        "username": profile.username,
-        "fullname": profile.full_name,
-        "biography": profile.biography,
-        "followers": profile.followers,
-        "followees": profile.followees,
-        "is_private": profile.is_private,
-        "profile_pic_url": profile.profile_pic_url,
+
+    client = get_client(token)
+    info = client.user_info_by_username(username)
+    return {
+        "username": info.username,
+        "full_name": info.full_name,
+        "biography": info.biography,
+        "followers": info.follower_count,
+        "followees": info.following_count,
+        "is_private": info.is_private,
+        "profile_pic_url": info.profile_pic_url,
     }
-    return data
 
 
 @app.get("/posts/{username}")
 def posts(username: str, token: str = Query(...), limit: int = 5):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    posts = []
-    for post in profile.get_posts():
-        posts.append(
-            {
-                "id": post.mediaid,
-                "shortcode": post.shortcode,
-                "url": post.url,
-                "caption": post.caption,
-                "date_utc": post.date_utc.isoformat(),
-            }
-        )
-        if len(posts) >= limit:
-            break
-    return {"posts": posts}
+
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    medias = client.user_medias(user_id, amount=limit)
+    items = [
+        {
+            "id": m.id,
+            "shortcode": m.code,
+            "caption": m.caption_text,
+            "url": m.thumbnail_url,
+            "taken_at": m.taken_at.isoformat(),
+        }
+        for m in medias
+    ]
+    return {"posts": items}
 
 
-@app.get("/comments/{shortcode}")
-def comments(shortcode: str, token: str = Query(...), limit: int = 20):
-    loader = get_loader(token)
-    post = instaloader.Post.from_shortcode(loader.context, shortcode)
-    comments = []
-    for c in post.get_comments():
-        comments.append(
-            {
-                "id": c.id,
-                "user": c.owner.username,
-                "text": c.text,
-                "created_at": c.created_at_utc.isoformat(),
-            }
-        )
-        if len(comments) >= limit:
-            break
-    return {"comments": comments}
+@app.get("/comments/{media_id}")
+def comments(media_id: str, token: str = Query(...), limit: int = 20):
+    client = get_client(token)
+    cmts = client.media_comments(media_id, amount=limit)
+    items = [
+        {
+            "id": c.pk,
+            "user": c.user.username,
+            "text": c.text,
+            "created_at": c.created_at.isoformat(),
+        }
+        for c in cmts
+    ]
+    return {"comments": items}
 
 
 @app.get("/stories/{username}")
 def stories(username: str, token: str = Query(...)):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    stories = []
-    for story in loader.get_stories(userids=[profile.userid]):
-        for item in story.get_items():
-            stories.append(
-                {
-                    "id": item.mediaid,
-                    "url": item.url,
-                    "date_utc": item.date_utc.isoformat(),
-                }
-            )
-    return {"stories": stories}
+
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    sts = client.user_stories(user_id)
+    items = [
+        {"id": s.pk, "url": s.thumbnail_url, "taken_at": s.taken_at.isoformat()}
+        for s in sts
+    ]
+    return {"stories": items}
+
 
 
 @app.get("/followers/{username}")
 def followers(username: str, token: str = Query(...), limit: int = 20):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    followers = []
-    for f in profile.get_followers():
-        followers.append(f.username)
-        if len(followers) >= limit:
-            break
-    return {"followers": followers}
+
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    data = client.user_followers(user_id, amount=limit)
+    return {"followers": [u.username for u in data.values()]}
+
 
 
 @app.get("/followings/{username}")
 def followings(username: str, token: str = Query(...), limit: int = 20):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    followees = []
-    for f in profile.get_followees():
-        followees.append(f.username)
-        if len(followees) >= limit:
-            break
-    return {"followings": followees}
+
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    data = client.user_following(user_id, amount=limit)
+    return {"followings": [u.username for u in data.values()]}
+
 
 
 @app.get("/hashtag/{tag}")
 def hashtag(tag: str, token: str = Query(...), limit: int = 10):
-    loader = get_loader(token)
-    hashtag = instaloader.Hashtag.from_name(loader.context, tag)
-    posts = []
-    for post in hashtag.get_posts():
-        posts.append(
-            {
-                "shortcode": post.shortcode,
-                "url": post.url,
-                "caption": post.caption,
-            }
-        )
-        if len(posts) >= limit:
-            break
-    return {"hashtag": tag, "posts": posts}
+
+    client = get_client(token)
+    medias = client.hashtag_medias_recent(tag, amount=limit)
+    items = [
+        {
+            "id": m.id,
+            "shortcode": m.code,
+            "caption": m.caption_text,
+            "url": m.thumbnail_url,
+        }
+        for m in medias
+    ]
+    return {"hashtag": tag, "posts": items}
+
 
 
 @app.get("/reels/{username}")
 def reels(username: str, token: str = Query(...), limit: int = 5):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    reels = []
-    for post in profile.get_clips():
-        reels.append(
-            {
-                "shortcode": post.shortcode,
-                "url": post.url,
-                "caption": post.caption,
-            }
-        )
-        if len(reels) >= limit:
-            break
-    return {"reels": reels}
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    clips = client.user_clips(user_id, amount=limit)
+    items = [
+        {
+            "id": c.id,
+            "shortcode": c.code,
+            "caption": c.caption_text,
+            "url": c.thumbnail_url,
+        }
+        for c in clips
+    ]
+    return {"reels": items}
 
 
 @app.get("/highlights/{username}")
 def highlights(username: str, token: str = Query(...)):
-    loader = get_loader(token)
-    profile = instaloader.Profile.from_username(loader.context, username)
-    highlights = []
-    for hl in profile.get_highlights():
-        for item in hl.get_items():
-            highlights.append(
+    client = get_client(token)
+    user_id = client.user_id_from_username(username)
+    hl_list = client.highlights_user(user_id)
+    items = []
+    for hl in hl_list:
+        for m in client.highlight_medias(hl.id):
+            items.append(
                 {
-                    "id": item.mediaid,
+                    "id": m.id,
                     "title": hl.title,
-                    "url": item.url,
-                    "date_utc": item.date_utc.isoformat(),
+                    "url": m.thumbnail_url,
+                    "taken_at": m.taken_at.isoformat(),
                 }
             )
-    return {"highlights": highlights}
+    return {"highlights": items}
+
+
+@app.get("/download/{media_id}")
+def download(media_id: str, token: str = Query(...)):
+    client = get_client(token)
+    info = client.media_info(media_id)
+    if info.media_type == 1:
+        path = client.photo_download(info.pk)
+    elif info.media_type == 2:
+        path = client.video_download(info.pk)
+    elif info.media_type == 8:
+        path = client.album_download(info.pk)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported media type")
+    return FileResponse(path, filename=Path(path).name)
