@@ -39,7 +39,6 @@ Typical n8n workflow:
 You can conditionally switch the base URL between the Railway deployment and `http://localhost:8000` for local
 testing.
 
-
 ## Docker
 
 Build and run:
