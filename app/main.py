@@ -26,7 +26,6 @@ class LoginRequest(BaseModel):
 
 @app.post("/login")
 def login(req: LoginRequest):
-
     """Create an authenticated or anonymous session.
 
     If no credentials are supplied an anonymous session is returned. Some
@@ -34,8 +33,8 @@ def login(req: LoginRequest):
     retrieved.
     """
 
-    client = Client(enforce_login=False)
 
+    client = Client()
     if req.sessionid:
         client.sessionid = req.sessionid
         try:
@@ -44,7 +43,6 @@ def login(req: LoginRequest):
             raise HTTPException(status_code=401, detail=str(e))
     elif req.username and req.password:
         try:
-
             client.login(req.username, req.password)
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
@@ -52,7 +50,6 @@ def login(req: LoginRequest):
     token = str(uuid.uuid4())
     _sessions[token] = client
     return {"token": token}
-
 
 
 @app.post("/logout")
