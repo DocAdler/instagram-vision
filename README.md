@@ -43,3 +43,7 @@ docker run -p 8000:8000 instagram-vision
 ## Responsible use
 
 Ensure you follow Instagram's Terms of Service and comply with local laws when scraping or downloading content.
+
+## License
+
+Released under the [MIT License](LICENSE).
